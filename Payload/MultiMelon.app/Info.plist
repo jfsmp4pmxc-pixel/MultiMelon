@@ -6,7 +6,7 @@
     <string>MultiMelon</string>
     
     <key>CFBundleIdentifier</key>
-    <string>com.retrodev.multimelon</string>
+    <string>com.ios.multimelon</string>
     
     <key>CFBundleDisplayName</key>
     <string>Multi Melon</string>
