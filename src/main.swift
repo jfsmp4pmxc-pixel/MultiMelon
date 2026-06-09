@@ -41,7 +41,7 @@ class MainViewController: UIViewController, UITableViewDataSource, UITableViewDe
     
     // ⚠️ ĐƯỜNG DẪN ĐẾN FILE JSON TRÊN GITHUB CỦA ÔNG
     // Lưu ý: Phải dùng link dạng RAW (raw.githubusercontent.com) thì app mới đọc được trực tiếp
-    let jsonRawUrl = "https://raw.githubusercontent.com/ten_tai_khoan/MultiMelon/main/versions.json"
+    let jsonRawUrl = "https://raw.githubusercontent.com/jfsmp4pmxc-pixel/MultiMelon/main/versions.json"
     
     override func viewDidLoad() {
         super.viewDidLoad()
