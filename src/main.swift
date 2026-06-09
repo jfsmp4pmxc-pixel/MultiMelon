@@ -1,29 +1,20 @@
 import UIKit
 import Foundation
 
-// Khai báo API ẩn của iOS để quét ứng dụng trên thiết bị (Yêu cầu TrollStore/Jailbreak)
+// Khai báo API ẩn kiểm tra ứng dụng hệ thống
 @objc protocol LSApplicationWorkspaceProtocol: NSObjectProtocol {
     func defaultWorkspace() -> AnyObject?
     func applicationProxyForIdentifier(_ identifier: String) -> AnyObject?
 }
 
-// Cấu trúc dữ liệu phiên bản Melon Sandbox
-struct MelonVersion {
+// Cấu trúc dữ liệu Melon chuẩn cấu trúc của file JSON (phải kế thừa Decodable để tự động parse)
+struct MelonVersion: Decodable {
     let id: Int
     let name: String
     let bundleIdentifier: String
     let ipaUrl: String
 }
 
-// Danh sách các bản Clone dọn sẵn trên Server của ông
-let melonServerList: [MelonVersion] = [
-    MelonVersion(id: 1, name: "Melon Sandbox - Bản Gốc", bundleIdentifier: "com.twentyseven.melonsandbox", ipaUrl: "https://yourserver.com/melon_original.ipa"),
-    MelonVersion(id: 2, name: "Melon Sandbox - Bản Clone 1", bundleIdentifier: "com.twentyseven.melonsandbox.clone1", ipaUrl: "https://yourserver.com/melon_clone1.ipa"),
-    MelonVersion(id: 3, name: "Melon Sandbox - Bản Clone 2", bundleIdentifier: "com.twentyseven.melonsandbox.clone2", ipaUrl: "https://yourserver.com/melon_clone2.ipa"),
-    MelonVersion(id: 4, name: "Melon Sandbox - Bản Clone 3", bundleIdentifier: "com.twentyseven.melonsandbox.clone3", ipaUrl: "https://yourserver.com/melon_clone3.ipa")
-]
-
-// Hàm kiểm tra xem app đã được cài đặt trên máy chưa
 func checkAppInstalled(bundleIdentifier: String) -> Bool {
     guard let workspaceClass = NSClassFromString("LSApplicationWorkspace") as? NSObject.Type,
           let workspace = workspaceClass.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue() else {
@@ -37,29 +28,82 @@ func checkAppInstalled(bundleIdentifier: String) -> Bool {
     return false
 }
 
-// --- GIAO DIỆN CHÍNH CỦA ỨNG DỤNG (GUI) ---
+// --- GIAO DIỆN CHÍNH (GUI) ---
 class MainViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
     
     var tableView: UITableView!
     var segmentedControl: UISegmentedControl!
-    var currentTab = 0 // 0: Server, 1: Đã cài đặt
-    var displayedApps: [MelonVersion] = []
+    var loadingIndicator: UIActivityIndicatorView!
+    
+    var currentTab = 0 
+    var serverList: [MelonVersion] = []       // Danh sách gốc tải từ JSON về
+    var displayedApps: [MelonVersion] = []    // Danh sách đang hiển thị trên màn hình
+    
+    // ⚠️ ĐƯỜNG DẪN ĐẾN FILE JSON TRÊN GITHUB CỦA ÔNG
+    // Lưu ý: Phải dùng link dạng RAW (raw.githubusercontent.com) thì app mới đọc được trực tiếp
+    let jsonRawUrl = "https://raw.githubusercontent.com/ten_tai_khoan/MultiMelon/main/versions.json"
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        
-        // Thiết lập nền đen chuẩn Retro
         view.backgroundColor = .black
         
         setupHeaderBanner()
         setupTabControl()
         setupTableView()
+        setupLoadingIndicator()
         
-        // Tải dữ liệu mặc định cho Tab Server
-        refreshData()
+        // Bắt đầu tải dữ liệu từ mạng
+        fetchJsonData()
     }
     
-    // 1. Tạo Banner chữ nghệ thuật phía trên cùng app
+    // Hàm gọi mạng tải file JSON về từ xa
+    func fetchJsonData() {
+        guard let url = URL(string: jsonRawUrl.replacingOccurrences(of: "ten_tai_khoan", with: "YOUR_REAL_GITHUB_USERNAME")) else { 
+            print("URL cấu hình không hợp lệ")
+            return 
+        }
+        
+        loadingIndicator.startAnimating()
+        
+        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+            guard let self = self else { return }
+            
+            if let data = data, error == nil {
+                do {
+                    // Tự động phân tích cú pháp JSON thành mảng dữ liệu Swift
+                    let decodedData = try JSONDecoder().decode([MelonVersion].self, from: data)
+                    
+                    DispatchQueue.main.sync {
+                        self.serverList = decodedData
+                        self.refreshData()
+                        self.loadingIndicator.stopAnimating()
+                    }
+                } catch {
+                    print("Lỗi phân tích file JSON: \(error)")
+                    DispatchQueue.main.sync { self.loadingIndicator.stopAnimating() }
+                }
+            } else {
+                print("Lỗi kết nối mạng hoặc server tèo")
+                DispatchQueue.main.sync { self.loadingIndicator.stopAnimating() }
+            }
+        }.resume()
+    }
+    
+    func refreshData() {
+        displayedApps.removeAll()
+        if currentTab == 0 {
+            displayedApps = serverList
+        } else {
+            for melon in serverList {
+                if checkAppInstalled(bundleIdentifier: melon.bundleIdentifier) {
+                    displayedApps.append(melon)
+                }
+            }
+        }
+        tableView.reloadData()
+    }
+    
+    // --- CẤU HÌNH GIAO DIỆN (UI) ---
     func setupHeaderBanner() {
         let bannerLabel = UILabel()
         bannerLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -73,7 +117,7 @@ class MainViewController: UIViewController, UITableViewDataSource, UITableViewDe
         | |\\/| | | | | | __| | | |\\/| |/ _ \\ |
         | |  | | |_| | | |_| | | |  | |  __/ |
         |_|  |_|\\__,_|_|\\__|_| |_|  |_|\\___|_|
-        ======= RETRO MANAGEMENT SYSTEM =======
+        ======= CLOUD MANAGEMENT SYSTEM =======
         """
         view.addSubview(bannerLabel)
         
@@ -84,27 +128,22 @@ class MainViewController: UIViewController, UITableViewDataSource, UITableViewDe
         ])
     }
     
-    // 2. Tạo Thanh chuyển Tab (Server / Đã Cài Đặt)
     func setupTabControl() {
-        let items = ["Kho Phiên Bản", "Đã Cài Đặt"]
+        let items = ["Kho Máy Chủ", "Đã Cài Đặt"]
         segmentedControl = UISegmentedControl(items: items)
         segmentedControl.translatesAutoresizingMaskIntoConstraints = false
         segmentedControl.selectedSegmentIndex = 0
-        
-        // Custom màu sắc phong cách Retro màu xanh lá cây
         segmentedControl.backgroundColor = .darkGray
         segmentedControl.selectedSegmentTintColor = .green
         
         let normalAttributes = [NSAttributedString.Key.foregroundColor: UIColor.white, NSAttributedString.Key.font: UIFont.monospacedSystemFont(ofSize: 13, weight: .regular)]
         let selectedAttributes = [NSAttributedString.Key.foregroundColor: UIColor.black, NSAttributedString.Key.font: UIFont.monospacedSystemFont(ofSize: 13, weight: .bold)]
-        
         segmentedControl.setTitleTextAttributes(normalAttributes, for: .normal)
         segmentedControl.setTitleTextAttributes(selectedAttributes, for: .selected)
         
         segmentedControl.addTarget(self, action: #selector(tabChanged(_:)), for: .valueChanged)
         view.addSubview(segmentedControl)
         
-        // Tìm nhãn chữ banner phía trên để neo thanh chuyển tab xuống dưới nó
         if let banner = view.subviews.first(where: { $0 is UILabel }) {
             NSLayoutConstraint.activate([
                 segmentedControl.topAnchor.constraint(equalTo: banner.bottomAnchor, constant: 15),
@@ -115,7 +154,6 @@ class MainViewController: UIViewController, UITableViewDataSource, UITableViewDe
         }
     }
     
-    // 3. Tạo Bảng danh sách các bản Melon
     func setupTableView() {
         tableView = UITableView()
         tableView.translatesAutoresizingMaskIntoConstraints = false
@@ -134,35 +172,26 @@ class MainViewController: UIViewController, UITableViewDataSource, UITableViewDe
         ])
     }
     
-    // Xử lý sự kiện khi người dùng chuyển Tab
+    func setupLoadingIndicator() {
+        loadingIndicator = UIActivityIndicatorView(style: .large)
+        loadingIndicator.color = .green
+        loadingIndicator.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(loadingIndicator)
+        
+        NSLayoutConstraint.activate([
+            loadingIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            loadingIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+        ])
+    }
+    
     @objc func tabChanged(_ sender: UISegmentedControl) {
         currentTab = sender.selectedSegmentIndex
         refreshData()
     }
     
-    // Làm mới danh sách hiển thị tương ứng với từng Tab
-    func refreshData() {
-        displayedApps.removeAll()
-        if currentTab == 0 {
-            // Tab 0: Lấy toàn bộ danh sách trên server
-            displayedApps = melonServerList
-        } else {
-            // Tab 1: Quét hệ thống xem bản nào cài rồi thì mới đưa vào danh sách
-            for melon in melonServerList {
-                if checkAppInstalled(bundleIdentifier: melon.bundleIdentifier) {
-                    displayedApps.append(melon)
-                }
-            }
-        }
-        tableView.reloadData()
-    }
-    
-    // --- ĐỊNH CẤU HÌNH TABLEVIEW DATASOURCE / DELEGATE ---
+    // --- DELEGATE TABLEVIEW ---
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        if displayedApps.count == 0 {
-            return 1 // Hiển thị 1 dòng thông báo trống nếu không có dữ liệu
-        }
-        return displayedApps.count
+        return displayedApps.isEmpty ? 1 : displayedApps.count
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -170,10 +199,9 @@ class MainViewController: UIViewController, UITableViewDataSource, UITableViewDe
         cell.backgroundColor = .black
         cell.textLabel?.font = UIFont.monospacedSystemFont(ofSize: 14, weight: .regular)
         
-        // Nếu danh sách trống rỗng
-        if displayedApps.count == 0 {
+        if displayedApps.isEmpty {
             cell.textLabel?.textColor = .lightGray
-            cell.textLabel?.text = currentTab == 0 ? "[ ] Không có dữ liệu server." : "[ ] Chưa cài đặt phiên bản clone nào."
+            cell.textLabel?.text = currentTab == 0 ? "[ ] Đang đồng bộ kho dữ liệu..." : "[ ] Chưa phát hiện bản Clone nào."
             cell.accessoryView = nil
             return cell
         }
@@ -184,7 +212,6 @@ class MainViewController: UIViewController, UITableViewDataSource, UITableViewDe
         cell.textLabel?.textColor = .white
         cell.textLabel?.text = "> \(melon.name)"
         
-        // Tạo nút bấm hành động (Tải / Mở) ở góc bên phải mỗi dòng
         let actionButton = UIButton(type: .system)
         actionButton.titleLabel?.font = UIFont.monospacedSystemFont(ofSize: 12, weight: .bold)
         actionButton.frame = CGRect(x: 0, y: 0, width: 80, height: 30)
@@ -192,9 +219,8 @@ class MainViewController: UIViewController, UITableViewDataSource, UITableViewDe
         actionButton.layer.cornerRadius = 4
         
         if currentTab == 0 {
-            // Ở bên Tab Kho Server
             if isInstalled {
-                actionButton.setTitle("[ĐÃ CÀI]", for: .normal)
+                actionButton.setTitle("[CÀI ĐẶT]", for: .normal)
                 actionButton.setTitleColor(.lightGray, for: .normal)
                 actionButton.layer.borderColor = UIColor.lightGray.cgColor
                 actionButton.isEnabled = false
@@ -204,10 +230,8 @@ class MainViewController: UIViewController, UITableViewDataSource, UITableViewDe
                 actionButton.layer.borderColor = UIColor.green.cgColor
                 actionButton.tag = indexPath.row
                 actionButton.addTarget(self, action: #selector(installClicked(_:)), for: .touchUpInside)
-                actionButton.isEnabled = true
             }
         } else {
-            // Ở bên Tab Đã Cài Đặt
             actionButton.setTitle("RUN >", for: .normal)
             actionButton.setTitleColor(.cyan, for: .normal)
             actionButton.layer.borderColor = UIColor.cyan.cgColor
@@ -219,22 +243,16 @@ class MainViewController: UIViewController, UITableViewDataSource, UITableViewDe
         return cell
     }
     
-    // Thực hiện hành động gọi TrollStore khi nhấn nút GET
     @objc func installClicked(_ sender: UIButton) {
-        let index = sender.tag
-        let selectedApp = displayedApps[index]
-        let trollStoreUrlString = "trollstore://install?url=\(selectedApp.ipaUrl)"
-        
-        if let url = URL(string: trollStoreUrlString) {
+        let selectedApp = displayedApps[sender.tag]
+        let trollStoreUrl = "trollstore://install?url=\(selectedApp.ipaUrl)"
+        if let url = URL(string: trollStoreUrl) {
             UIApplication.shared.open(url, options: [:], completionHandler: nil)
         }
     }
     
-    // Thực hiện mở nhanh ứng dụng Melon khi nhấn nút RUN
     @objc func runClicked(_ sender: UIButton) {
-        let index = sender.tag
-        let selectedApp = displayedApps[index]
-        
+        let selectedApp = displayedApps[sender.tag]
         if let workspaceClass = NSClassFromString("LSApplicationWorkspace") as? NSObject.Type,
            let workspace = workspaceClass.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue() {
             let selector = NSSelectorFromString("openApplicationWithBundleID:")
@@ -244,27 +262,18 @@ class MainViewController: UIViewController, UITableViewDataSource, UITableViewDe
         }
     }
     
-    func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
-        return 50
-    }
+    func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat { return 50 }
 }
 
-// --- KHỞI CHẠY HỆ THỐNG ỨNG DỤNG GUI ---
+// --- KHỞI CHẠY APP ---
 class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
-
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         window = UIWindow(frame: UIScreen.main.bounds)
-        let mainVC = MainViewController()
-        window?.rootViewController = mainVC
+        window?.rootViewController = MainViewController()
         window?.makeKeyAndVisible()
         return true
     }
 }
 
-UIApplicationMain(
-    CommandLine.argc,
-    CommandLine.unsafeArgv,
-    nil,
-    NSStringFromClass(AppDelegate.self)
-)
+UIApplicationMain(CommandLine.argc, CommandLine.unsafeArgv, nil, NSStringFromClass(AppDelegate.self))
