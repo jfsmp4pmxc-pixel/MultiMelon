@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1,
+    "name": "Melon Sandbox - Bản Gốc",
+    "bundleIdentifier": "com.twentyseven.melonsandbox",
+    "ipaUrl": "https://github.com/ten_tai_khoan/MultiMelon/releases/download/v1.0-clones/melon_original.ipa"
+  },
+  {
+    "id": 2,
+    "name": "Melon Sandbox - Bản Clone 1",
+    "bundleIdentifier": "com.twentyseven.melonsandbox.clone1",
+    "ipaUrl": "https://github.com/ten_tai_khoan/MultiMelon/releases/download/v1.0-clones/melon_clone1.ipa"
+  },
+  {
+    "id": 3,
+    "name": "Melon Sandbox - Bản Clone 2",
+    "bundleIdentifier": "com.twentyseven.melonsandbox.clone2",
+    "ipaUrl": "https://github.com/ten_tai_khoan/MultiMelon/releases/download/v1.0-clones/melon_clone2.ipa"
+  }
+]
