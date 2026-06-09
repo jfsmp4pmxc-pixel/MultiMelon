@@ -22,9 +22,10 @@ jobs:
         # Liên kết với MobileCoreServices để dùng các hàm quét ứng dụng hệ thống
         swiftc -sdk $SDKPATH -target arm64-apple-ios15.0 -framework MobileCoreServices src/main.swift -o Payload/MultiMelon.app/MultiMelon
 
-    - name: Ký giả lập (Ad-hoc Sign) để tránh crash
+   - name: Ký giả lập (Ad-hoc Sign) để tránh crash
       run: |
-        codesign --force --sign - --entitlements /dev/null Payload/MultiMelon.app/MultiMelon
+        # Bỏ phần --entitlements /dev/null đi để macOS không bị lỗi đọc file
+        codesign --force --sign - Payload/MultiMelon.app/MultiMelon
 
     - name: Đóng gói thành file IPA
       run: |
