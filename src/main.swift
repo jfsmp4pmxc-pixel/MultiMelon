@@ -112,7 +112,7 @@ class MainViewController: UIViewController, UITableViewDataSource, UITableViewDe
     func setupHeaderBanner() {
         let bannerLabel = UILabel()
         bannerLabel.translatesAutoresizingMaskIntoConstraints = false
-        bannerLabel.textColor = .green
+        bannerLabel.textColor = .black
         bannerLabel.numberOfLines = 0
         bannerLabel.textAlignment = .center
         bannerLabel.font = UIFont.monospacedSystemFont(ofSize: 11, weight: .bold)
@@ -138,8 +138,8 @@ class MainViewController: UIViewController, UITableViewDataSource, UITableViewDe
         segmentedControl = UISegmentedControl(items: items)
         segmentedControl.translatesAutoresizingMaskIntoConstraints = false
         segmentedControl.selectedSegmentIndex = 0
-        segmentedControl.backgroundColor = .darkGray
-        segmentedControl.selectedSegmentTintColor = .green
+        segmentedControl.backgroundColor = .white
+        segmentedControl.selectedSegmentTintColor = .blue
         
         let normalAttributes = [NSAttributedString.Key.foregroundColor: UIColor.white, NSAttributedString.Key.font: UIFont.monospacedSystemFont(ofSize: 13, weight: .regular)]
         let selectedAttributes = [NSAttributedString.Key.foregroundColor: UIColor.black, NSAttributedString.Key.font: UIFont.monospacedSystemFont(ofSize: 13, weight: .bold)]
