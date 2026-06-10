@@ -36,13 +36,15 @@ class MainViewController: UIViewController, UITableViewDataSource, UITableViewDe
     var serverList: [MelonVersion] = []       
     var displayedApps: [MelonVersion] = []    
     
-    // ⚠️ ÔNG THAY THẲNG LINK RAW GIÁO TIẾP TỪ GITHUB CỦA ÔNG VÀO ĐÂY NHA:
-    // Ví dụ: "https://raw.githubusercontent.com/DungDev/MultiMelon/main/versions.json"
-    let jsonRawUrl = "https://raw.githubusercontent.com/THAY_TEN_TAI_KHOAN_CUA_ONG_VAO_DAY/MultiMelon/main/versions.json"
+    // ✅ ĐÃ ĐỔI CHUẨN ĐƯỜNG DẪN RAW THEO TÊN ACC CỦA ÔNG
+    let jsonRawUrl = "https://raw.githubusercontent.com/jfsmp4pmxc-pixel/MultiMelon/main/versions.json"
     
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
+        
+        // nạp dữ liệu dự phòng thiết lập sẵn (để nút GET luôn hoạt động kể cả khi mất mạng)
+        setupOfflineBackupData()
         
         setupHeaderBanner()
         setupTabControl()
@@ -52,46 +54,42 @@ class MainViewController: UIViewController, UITableViewDataSource, UITableViewDe
         fetchJsonData()
     }
     
+    // Dữ liệu dự phòng chuẩn link release của ông phòng khi file JSON bị lỗi cú pháp
+    func setupOfflineBackupData() {
+        let backup = [
+            MelonVersion(id: 1, name: "Melon Sandbox - Bản Gốc", bundleIdentifier: "com.twentyseven.melonsandbox", ipaUrl: "https://github.com/jfsmp4pmxc-pixel/MultiMelon/releases/download/v1.0-clones/melon_original.ipa"),
+            MelonVersion(id: 2, name: "Melon Sandbox - Bản Clone 1", bundleIdentifier: "com.twentyseven.melonsandbox.clone1", ipaUrl: "https://github.com/jfsmp4pmxc-pixel/MultiMelon/releases/download/v1.0-clones/melon_clone1.ipa"),
+            MelonVersion(id: 3, name: "Melon Sandbox - Bản Clone 2", bundleIdentifier: "com.twentyseven.melonsandbox.clone2", ipaUrl: "https://github.com/jfsmp4pmxc-pixel/MultiMelon/releases/download/v1.0-clones/melon_clone2.ipa")
+        ]
+        self.serverList = backup
+        self.displayedApps = backup
+    }
+    
     func fetchJsonData() {
-        guard let url = URL(string: jsonRawUrl) else { 
-            print("[❌] Link URL JSON cấu hình không hợp lệ!")
-            return 
-        }
+        guard let url = URL(string: jsonRawUrl) else { return }
         
         loadingIndicator.startAnimating()
         
-        // Cấu hình bỏ qua cache để luôn lấy file JSON mới nhất trên mạng
         var request = URLRequest(url: url)
         request.cachePolicy = .reloadIgnoringLocalCacheData
-        request.timeoutInterval = 15.0
+        request.timeoutInterval = 10.0
         
         URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             guard let self = self else { return }
             
-            // Tắt hiệu ứng quay quay trên luồng chính
             DispatchQueue.main.async { self.loadingIndicator.stopAnimating() }
             
-            if let error = error {
-                print("[❌] Lỗi kết nối mạng: \(error.localizedDescription)")
-                return
-            }
-            
-            guard let data = data else {
-                print("[❌] Không nhận được dữ liệu từ Server")
-                return
-            }
-            
-            do {
-                let decodedData = try JSONDecoder().decode([MelonVersion].self, from: data)
-                print("[✅] Đã tải thành công \(decodedData.count) phiên bản từ JSON!")
-                
-                // Bắt buộc iOS phải cập nhật giao diện ngay lập tức trên Luồng Chính (Main Thread)
-                DispatchQueue.main.async {
-                    self.serverList = decodedData
-                    self.refreshData()
+            if let data = data, error == nil {
+                do {
+                    let decodedData = try JSONDecoder().decode([MelonVersion].self, from: data)
+                    print("[✅] Kết nối đám mây thành công!")
+                    DispatchQueue.main.async {
+                        self.serverList = decodedData
+                        self.refreshData()
+                    }
+                } catch {
+                    print("[❌] Lỗi dịch JSON, ứng dụng tự động dùng data dự phòng")
                 }
-            } catch {
-                print("[❌] Lỗi cấu trúc file JSON bị viết sai cú pháp: \(error)")
             }
         }.resume()
     }
@@ -110,7 +108,7 @@ class MainViewController: UIViewController, UITableViewDataSource, UITableViewDe
         tableView.reloadData()
     }
     
-    // --- UI SETUP ---
+    // --- GIAO DIỆN RETRO PIXEL ---
     func setupHeaderBanner() {
         let bannerLabel = UILabel()
         bannerLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -196,7 +194,7 @@ class MainViewController: UIViewController, UITableViewDataSource, UITableViewDe
         refreshData()
     }
     
-    // --- TABLEVIEW DELEGATE ---
+    // --- TABLEVIEW LOGIC ---
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         return displayedApps.isEmpty ? 1 : displayedApps.count
     }
@@ -207,10 +205,9 @@ class MainViewController: UIViewController, UITableViewDataSource, UITableViewDe
         cell.selectionStyle = .none
         cell.textLabel?.font = UIFont.monospacedSystemFont(ofSize: 14, weight: .regular)
         
-        // Xử lý khi mảng rỗng (Chưa load xong JSON hoặc chưa cài bản nào)
         if displayedApps.isEmpty {
             cell.textLabel?.textColor = .lightGray
-            cell.textLabel?.text = currentTab == 0 ? "[ ] Đang đồng bộ kho dữ liệu từ xa..." : "[ ] Không tìm thấy bản clone nào đã cài."
+            cell.textLabel?.text = currentTab == 0 ? "[ ] Không có dữ liệu." : "[ ] Không tìm thấy bản clone nào đã cài."
             cell.accessoryView = nil
             return cell
         }
@@ -255,13 +252,10 @@ class MainViewController: UIViewController, UITableViewDataSource, UITableViewDe
     }
     
     @objc func installClicked(_ sender: UIButton) {
-        // Rào chắn bảo vệ: Chỉ xử lý khi mảng thực sự có dữ liệu
         guard sender.tag < displayedApps.count else { return }
-        
         let selectedApp = displayedApps[sender.tag]
         let trollStoreUrl = "trollstore://install?url=\(selectedApp.ipaUrl)"
         
-        print("[🚀] Đang gọi mở URL: \(trollStoreUrl)")
         if let url = URL(string: trollStoreUrl) {
             UIApplication.shared.open(url, options: [:], completionHandler: nil)
         }
@@ -269,7 +263,6 @@ class MainViewController: UIViewController, UITableViewDataSource, UITableViewDe
     
     @objc func runClicked(_ sender: UIButton) {
         guard sender.tag < displayedApps.count else { return }
-        
         let selectedApp = displayedApps[sender.tag]
         if let workspaceClass = NSClassFromString("LSApplicationWorkspace") as? NSObject.Type,
            let workspace = workspaceClass.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue() {
