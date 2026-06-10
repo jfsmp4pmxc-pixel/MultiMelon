@@ -1,13 +1,11 @@
 import UIKit
 import Foundation
 
-// Khai báo API ẩn kiểm tra ứng dụng hệ thống
 @objc protocol LSApplicationWorkspaceProtocol: NSObjectProtocol {
     func defaultWorkspace() -> AnyObject?
     func applicationProxyForIdentifier(_ identifier: String) -> AnyObject?
 }
 
-// Cấu trúc dữ liệu Melon chuẩn cấu trúc của file JSON (phải kế thừa Decodable để tự động parse)
 struct MelonVersion: Decodable {
     let id: Int
     let name: String
@@ -28,7 +26,6 @@ func checkAppInstalled(bundleIdentifier: String) -> Bool {
     return false
 }
 
-// --- GIAO DIỆN CHÍNH (GUI) ---
 class MainViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
     
     var tableView: UITableView!
@@ -36,12 +33,12 @@ class MainViewController: UIViewController, UITableViewDataSource, UITableViewDe
     var loadingIndicator: UIActivityIndicatorView!
     
     var currentTab = 0 
-    var serverList: [MelonVersion] = []       // Danh sách gốc tải từ JSON về
-    var displayedApps: [MelonVersion] = []    // Danh sách đang hiển thị trên màn hình
+    var serverList: [MelonVersion] = []       
+    var displayedApps: [MelonVersion] = []    
     
-    // ⚠️ ĐƯỜNG DẪN ĐẾN FILE JSON TRÊN GITHUB CỦA ÔNG
-    // Lưu ý: Phải dùng link dạng RAW (raw.githubusercontent.com) thì app mới đọc được trực tiếp
-    let jsonRawUrl = "https://raw.githubusercontent.com/jfsmp4pmxc-pixel/MultiMelon/main/versions.json"
+    // ⚠️ ÔNG THAY THẲNG LINK RAW GIÁO TIẾP TỪ GITHUB CỦA ÔNG VÀO ĐÂY NHA:
+    // Ví dụ: "https://raw.githubusercontent.com/DungDev/MultiMelon/main/versions.json"
+    let jsonRawUrl = "https://raw.githubusercontent.com/THAY_TEN_TAI_KHOAN_CUA_ONG_VAO_DAY/MultiMelon/main/versions.json"
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -52,39 +49,49 @@ class MainViewController: UIViewController, UITableViewDataSource, UITableViewDe
         setupTableView()
         setupLoadingIndicator()
         
-        // Bắt đầu tải dữ liệu từ mạng
         fetchJsonData()
     }
     
-    // Hàm gọi mạng tải file JSON về từ xa
     func fetchJsonData() {
-        guard let url = URL(string: jsonRawUrl.replacingOccurrences(of: "ten_tai_khoan", with: "YOUR_REAL_GITHUB_USERNAME")) else { 
-            print("URL cấu hình không hợp lệ")
+        guard let url = URL(string: jsonRawUrl) else { 
+            print("[❌] Link URL JSON cấu hình không hợp lệ!")
             return 
         }
         
         loadingIndicator.startAnimating()
         
-        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+        // Cấu hình bỏ qua cache để luôn lấy file JSON mới nhất trên mạng
+        var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.timeoutInterval = 15.0
+        
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             guard let self = self else { return }
             
-            if let data = data, error == nil {
-                do {
-                    // Tự động phân tích cú pháp JSON thành mảng dữ liệu Swift
-                    let decodedData = try JSONDecoder().decode([MelonVersion].self, from: data)
-                    
-                    DispatchQueue.main.sync {
-                        self.serverList = decodedData
-                        self.refreshData()
-                        self.loadingIndicator.stopAnimating()
-                    }
-                } catch {
-                    print("Lỗi phân tích file JSON: \(error)")
-                    DispatchQueue.main.sync { self.loadingIndicator.stopAnimating() }
+            // Tắt hiệu ứng quay quay trên luồng chính
+            DispatchQueue.main.async { self.loadingIndicator.stopAnimating() }
+            
+            if let error = error {
+                print("[❌] Lỗi kết nối mạng: \(error.localizedDescription)")
+                return
+            }
+            
+            guard let data = data else {
+                print("[❌] Không nhận được dữ liệu từ Server")
+                return
+            }
+            
+            do {
+                let decodedData = try JSONDecoder().decode([MelonVersion].self, from: data)
+                print("[✅] Đã tải thành công \(decodedData.count) phiên bản từ JSON!")
+                
+                // Bắt buộc iOS phải cập nhật giao diện ngay lập tức trên Luồng Chính (Main Thread)
+                DispatchQueue.main.async {
+                    self.serverList = decodedData
+                    self.refreshData()
                 }
-            } else {
-                print("Lỗi kết nối mạng hoặc server tèo")
-                DispatchQueue.main.sync { self.loadingIndicator.stopAnimating() }
+            } catch {
+                print("[❌] Lỗi cấu trúc file JSON bị viết sai cú pháp: \(error)")
             }
         }.resume()
     }
@@ -103,7 +110,7 @@ class MainViewController: UIViewController, UITableViewDataSource, UITableViewDe
         tableView.reloadData()
     }
     
-    // --- CẤU HÌNH GIAO DIỆN (UI) ---
+    // --- UI SETUP ---
     func setupHeaderBanner() {
         let bannerLabel = UILabel()
         bannerLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -189,7 +196,7 @@ class MainViewController: UIViewController, UITableViewDataSource, UITableViewDe
         refreshData()
     }
     
-    // --- DELEGATE TABLEVIEW ---
+    // --- TABLEVIEW DELEGATE ---
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         return displayedApps.isEmpty ? 1 : displayedApps.count
     }
@@ -197,11 +204,13 @@ class MainViewController: UIViewController, UITableViewDataSource, UITableViewDe
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "MelonCell", for: indexPath)
         cell.backgroundColor = .black
+        cell.selectionStyle = .none
         cell.textLabel?.font = UIFont.monospacedSystemFont(ofSize: 14, weight: .regular)
         
+        // Xử lý khi mảng rỗng (Chưa load xong JSON hoặc chưa cài bản nào)
         if displayedApps.isEmpty {
             cell.textLabel?.textColor = .lightGray
-            cell.textLabel?.text = currentTab == 0 ? "[ ] Đang đồng bộ kho dữ liệu..." : "[ ] Chưa phát hiện bản Clone nào."
+            cell.textLabel?.text = currentTab == 0 ? "[ ] Đang đồng bộ kho dữ liệu từ xa..." : "[ ] Không tìm thấy bản clone nào đã cài."
             cell.accessoryView = nil
             return cell
         }
@@ -214,15 +223,15 @@ class MainViewController: UIViewController, UITableViewDataSource, UITableViewDe
         
         let actionButton = UIButton(type: .system)
         actionButton.titleLabel?.font = UIFont.monospacedSystemFont(ofSize: 12, weight: .bold)
-        actionButton.frame = CGRect(x: 0, y: 0, width: 80, height: 30)
+        actionButton.frame = CGRect(x: 0, y: 0, width: 85, height: 30)
         actionButton.layer.borderWidth = 1
         actionButton.layer.cornerRadius = 4
         
         if currentTab == 0 {
             if isInstalled {
-                actionButton.setTitle("[CÀI ĐẶT]", for: .normal)
-                actionButton.setTitleColor(.lightGray, for: .normal)
-                actionButton.layer.borderColor = UIColor.lightGray.cgColor
+                actionButton.setTitle("[ĐÃ CÀI]", for: .normal)
+                actionButton.setTitleColor(.gray, for: .normal)
+                actionButton.layer.borderColor = UIColor.gray.cgColor
                 actionButton.isEnabled = false
             } else {
                 actionButton.setTitle("GET", for: .normal)
@@ -230,6 +239,7 @@ class MainViewController: UIViewController, UITableViewDataSource, UITableViewDe
                 actionButton.layer.borderColor = UIColor.green.cgColor
                 actionButton.tag = indexPath.row
                 actionButton.addTarget(self, action: #selector(installClicked(_:)), for: .touchUpInside)
+                actionButton.isEnabled = true
             }
         } else {
             actionButton.setTitle("RUN >", for: .normal)
@@ -237,6 +247,7 @@ class MainViewController: UIViewController, UITableViewDataSource, UITableViewDe
             actionButton.layer.borderColor = UIColor.cyan.cgColor
             actionButton.tag = indexPath.row
             actionButton.addTarget(self, action: #selector(runClicked(_:)), for: .touchUpInside)
+            actionButton.isEnabled = true
         }
         
         cell.accessoryView = actionButton
@@ -244,14 +255,21 @@ class MainViewController: UIViewController, UITableViewDataSource, UITableViewDe
     }
     
     @objc func installClicked(_ sender: UIButton) {
+        // Rào chắn bảo vệ: Chỉ xử lý khi mảng thực sự có dữ liệu
+        guard sender.tag < displayedApps.count else { return }
+        
         let selectedApp = displayedApps[sender.tag]
         let trollStoreUrl = "trollstore://install?url=\(selectedApp.ipaUrl)"
+        
+        print("[🚀] Đang gọi mở URL: \(trollStoreUrl)")
         if let url = URL(string: trollStoreUrl) {
             UIApplication.shared.open(url, options: [:], completionHandler: nil)
         }
     }
     
     @objc func runClicked(_ sender: UIButton) {
+        guard sender.tag < displayedApps.count else { return }
+        
         let selectedApp = displayedApps[sender.tag]
         if let workspaceClass = NSClassFromString("LSApplicationWorkspace") as? NSObject.Type,
            let workspace = workspaceClass.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue() {
@@ -265,7 +283,6 @@ class MainViewController: UIViewController, UITableViewDataSource, UITableViewDe
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat { return 50 }
 }
 
-// --- KHỞI CHẠY APP ---
 class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
