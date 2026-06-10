@@ -38,4 +38,9 @@
     <array>
         <integer>1</integer> </array>
 </dict>
+<key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <true/>
+    </dict>
 </plist>
