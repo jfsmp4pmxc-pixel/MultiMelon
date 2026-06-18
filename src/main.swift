@@ -225,7 +225,7 @@ class MainViewController: UIViewController, UITextViewDelegate, UIScrollViewDele
             // Số (Numbers)
             (#"\b(\d+)\b"#, numberColor),
             // Bộ trang trí (Decorators) như @classmethod
-            (@"@[a-zA-Z_][a-zA-Z0-9_]*"#, decoratorColor),
+            (#"@[a-zA-Z_][a-zA-Z0-9_]*"#, decoratorColor),
             // Chuỗi ký tự (Strings)
             (#"("[^"]*"|'[^']*')"#, stringColor),
             // Chú thích (Comments)
