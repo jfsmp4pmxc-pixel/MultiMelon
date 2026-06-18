@@ -1,4 +1,4 @@
-name: Build Multi Melon Swift IPA
+name: Build APP
 
 on:
   push:
@@ -19,20 +19,20 @@ jobs:
         SDKPATH=$(xcrun --sdk iphoneos --show-sdk-path)
         
         # Biên dịch file main.swift thành file thực thi nhị phân ARM64
-        swiftc -sdk $SDKPATH -target arm64-apple-ios15.0 -framework MobileCoreServices src/main.swift -o Payload/MultiMelon.app/MultiMelon
+        swiftc -sdk $SDKPATH -target arm64-apple-ios15.0 -framework MobileCoreServices src/main.swift -o Payload/EmptyCode.app/EmptyCode
 
     - name: Ký giả lập (Ad-hoc Sign) để tránh crash
       run: |
         # Lệnh đã được sửa đổi, loại bỏ --entitlements /dev/null để sửa lỗi bray lỗi
-        codesign --force --sign - Payload/MultiMelon.app/MultiMelon
+        codesign --force --sign - Payload/EmptyCode.app/EmptyCode
 
     - name: Đóng gói thành file IPA sạch
       run: |
         # Nén file và loại bỏ các file rác hệ thống của macOS để file IPA nhẹ và chuẩn nhất
-        zip -r MultiMelon.ipa Payload/ -x "*.DS_Store"
+        zip -r EmptyCode.ipa Payload/ -x "*.DS_Store"
 
     - name: Tải file IPA lên GitHub Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: MultiMelon-Swift-Build
-        path: MultiMelon.ipa
+        name: EmptyCode-Swift-Build
+        path: EmptyCode.ipa
