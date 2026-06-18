@@ -1,38 +1,73 @@
-name: Build APP
+- name: Tạo cấu trúc thư mục App chuẩn iOS
+      run: |
+        # Sửa thành EmptyCode.app để khớp với lệnh build bên dưới
+        mkdir -p Payload/EmptyCode.app
 
-on:
-  push:
-    branches: [ "main" ]
-  workflow_dispatch:
-
-jobs:
-  build:
-    runs-on: macos-latest
-
-    steps:
-    - name: Checkout mã nguồn
-      uses: actions/checkout@v4
+    - name: Tự động tạo file Info.plist cấu hình
+      run: |
+        cat > Payload/EmptyCode.app/Info.plist << 'EOF'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>CFBundleIdentifier</key>
+            <string>com.emptycode.ide</string>
+            <key>CFBundleName</key>
+            <string>EmptyCode</string>
+            <key>CFBundleExecutable</key>
+            <string>EmptyCode</string>
+            <key>CFBundleDevelopmentRegion</key>
+            <string>en</string>
+            <key>CFBundleInfoDictionaryVersion</key>
+            <string>6.0</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>CFBundleShortVersionString</key>
+            <string>1.0.0</string>
+            <key>CFBundleVersion</key>
+            <string>1</string>
+            <key>LSRequiresIPhoneOS</key>
+            <true/>
+            <key>MinimumOSVersion</key>
+            <string>15.0</string>
+            <key>UIDeviceFamily</key>
+            <array>
+                <integer>1</integer>
+                <integer>2</integer>
+            </array>
+            <key>UILaunchScreen</key>
+            <dict/>
+            <key>UISupportedInterfaceOrientations</key>
+            <array>
+                <string>UIInterfaceOrientationPortrait</string>
+            </array>
+        </dict>
+        </plist>
+        EOF
 
     - name: Biên dịch Code Swift sang ARM64 iOS
       run: |
-        # Lấy đường dẫn SDK iOS trên máy ảo Mac
         SDKPATH=$(xcrun --sdk iphoneos --show-sdk-path)
         
-        # Biên dịch file main.swift thành file thực thi nhị phân ARM64
-        swiftc -sdk $SDKPATH -target arm64-apple-ios15.0 -framework MobileCoreServices src/main.swift -o Payload/EmptyCode.app/EmptyCode
+        # Thêm đầy đủ các framework cần thiết để link lệnh không bị cảnh báo nhầm sysroot
+        swiftc -sdk $SDKPATH \
+               -target arm64-apple-ios15.0 \
+               -framework UIKit \
+               -framework Foundation \
+               -framework MobileCoreServices \
+               src/main.swift \
+               -o Payload/EmptyCode.app/EmptyCode
 
     - name: Ký giả lập (Ad-hoc Sign) để tránh crash
       run: |
-        # Lệnh đã được sửa đổi, loại bỏ --entitlements /dev/null để sửa lỗi bray lỗi
         codesign --force --sign - Payload/EmptyCode.app/EmptyCode
 
     - name: Đóng gói thành file IPA sạch
       run: |
-        # Nén file và loại bỏ các file rác hệ thống của macOS để file IPA nhẹ và chuẩn nhất
         zip -r EmptyCode.ipa Payload/ -x "*.DS_Store"
 
     - name: Tải file IPA lên GitHub Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: EmptyCode-Swift-Build
+        name: EmptyCode-Build
         path: EmptyCode.ipa
